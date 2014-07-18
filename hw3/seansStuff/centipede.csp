@@ -1,0 +1,914 @@
+          	.EQU KBD_CNTL,  	$000
+          	.EQU KBD_STAT,  	$000
+          	.EQU KBD_DATA,  	$001
+          	.EQU KBD_FLUSH, 	$40
+          	.EQU TIM_CNTL,      	$030
+          	.EQU TIM_STAT,      	$030
+          	.EQU TIM_VALUE,     	$031
+          	.EQU TIM_COUNT,     	$034
+            .EQU INTERRUPT_ENA,           $80
+          	.EQU RESET_READY_BIT,         $40
+          	.EQU START_AFTER_LOAD,        $10
+          	.EQU ENABLE_RESET_AND_START,  $D0
+          	.EQU ENABLE_AND_RESET,        $C0
+
+          	.EQU CRT_BUFFER,    	$100
+          	.EQU BOTTOM_RIGHT,  	$313
+          	.EQU CRT_XREG,      	$314
+	.EQU CRT_YREG,      	$315
+          	.EQU CRT_CNTL,      	$316
+          	.EQU CRT_DATA,      	$317
+	.EQU CRT_ROWS,      	14
+          	.EQU CRT_COLS,      	38
+          	.EQU CLEAR_DISPLAY, 	$01
+	.EQU HOME,		$04
+
+          	.EQU PUT_NUM,       	$E00      ; MINI_OS JSRS
+          	.EQU GET_NUM,       	$E01
+	.EQU GET_STR,	$E04
+          	.EQU PUT_STR,       	$E05
+          	.EQU PUT_NL,        	$E06
+          	.EQU PUT_NUM2,      	$E07
+          	.EQU PUT_CHR,       	$E08
+
+          	.EQU TOP,		0
+	.EQU BOTTOM,	13
+	.equ MAX_RIGHT,	37
+	.equ LEFT_ARROW,	'K'
+	.equ RIGHT_ARROW,	'M'
+	.EQU LEFT,		0
+	.EQU RIGHT,		1
+	.EQU QUIT,		'x'
+	.EQU START,		13 ; Enter key
+	.EQU NOKEY,		'n'
+	.EQU FIRE,		' '
+	.equ MUSHROOM, 	'T'
+	.equ HEAD,		'='
+	.equ BODY, 		'O'
+	.equ NO_BODY, 	' '
+	.equ WAND,		'A'
+	.equ SPARK, 	'*'
+	.equ SPACE,		' '
+	.equ NO_SPARK,	0
+	.equ CENTIPEDE_DEAD, 	1
+	.equ WAND_DEAD,	2
+	.equ SIZEOF_CENTIPEDE,	4
+	.equ ICON_POS,	0
+	.equ X_POS,		1
+	.equ Y_POS,		2
+	.equ ICON_BELOW_POS,	3
+	.equ NUM_PARTS,	6
+		
+	.EQU PLAY_DELAY,	1 ; # of timer iterations before ball moves
+	.EQU WINNER_DELAY,	10; # of timer iterations while winner shown
+
+  	LDS#  	$E00
+  	CIE
+	lda#	CRT_COLS / 2
+	sta 	wandX
+	jsr 	showIntro
+	psh#	centipedes
+	psh#	sparkXs
+	psh	wandX
+	psh#	direction
+	jsr	startGame	
+	LDA#	KEYISR
+        	STA 	$FF8
+      	LDA#	ENABLE_AND_RESET
+	OUTB 	KBD_CNTL
+          	LDA       	DELAY
+          	OUTW      	TIM_VALUE
+    	LDA#	TIMERISR
+	STA 	$FFB		; SET-UP TIMER ISR
+	LDA#	ENABLE_RESET_AND_START
+	OUTB 	TIM_CNTL         
+	SIE
+MAINLOOP:	NOP
+	JMP	MAINLOOP
+
+
+; void fireWand(int wandX, int sparkXs[])
+	.equ 	fireWandWandX, 3
+	.equ	fireWandSparkXs, 2
+fireWand:	bgn#	0
+	psha
+	pshx
+	ldx#	BOTTOM - 1
+	lda& !	fireWandSparkXs
+	cma#	NO_SPARK
+	jne	fireWand2
+	lda !	fireWandWandX
+	ldx#	BOTTOM
+	sta& !	fireWandSparkXs
+fireWand2:	popx
+	popa
+	fin#	0
+	rtn		; fireWand()
+
+; int getChar(int x, int y)
+	.equ	getCharX, 3
+	.equ	getCharY, 2
+getChar:	bgn#	0
+	pshx
+	lda !	getCharY
+	mul#	CRT_COLS
+	ada !	getCharX
+	tax
+	inb+	CRT_BUFFER
+	popx
+	fin#	0
+	rtn
+
+
+;int hitCentipede(Centipede centipedes[NUM_PARTS], int x, int y)
+	.equ	hitCentipedeCentipedes, 5
+	.equ	hitCentipedeX, 4
+	.equ	hitCentipedeY, 3
+	.equ	hitCentipedeI, 0
+hitCentipede:	bgn#	1
+	pshx
+	psh#	MUSHROOM
+	psh !	hitCentipedeX
+	psh !	hitCentipedeY
+	jsr	putChar		; putChar(MUSHROOM, x, y);
+	ads#	3
+	clr !	hitCentipedeI
+hitCentipede1: 			; for(i = 0; centipedes[i].x != x || centipedes[i].y != y; i++);
+	lda !	hitCentipedeI
+	mul#	SIZEOF_CENTIPEDE
+	ada# 	X_POS
+	tax
+	lda& !	hitCentipedeCentipedes	; centipedes[i].x
+	cma !	hitCentipedeX
+	jne	hitCentipede2
+	adx#	Y_POS - X_POS
+	lda& !	hitCentipedeCentipedes	; centipedes[i].y
+	cma !	hitCentipedeY
+	jeq	hitCentipede3
+hitCentipede2: 
+	inc !	hitCentipedeI	; i++
+	jmp	hitCentipede1
+hitCentipede3: 
+	adx#	ICON_BELOW_POS - Y_POS		; so icon
+	lda#	MUSHROOM
+	sta& !	hitCentipedeCentipedes	;  centipedes[i].icon_below = MUSHROOM;
+	sbx#	ICON_BELOW_POS - ICON_POS 
+	lda& !	hitCentipedeCentipedes  ; centipedes[i].icon
+	cma#	HEAD	
+	jne	hitCentipede7	;  if(centipedes[i].icon == HEAD)
+	lda#	NO_BODY
+	sta& !	hitCentipedeCentipedes	; centipedes[i].icon = NO_BODY;
+	inc !	hitCentipedeI	; i++
+hitCentipede4:
+	lda !	hitCentipedeI	; for(i++; i < NUM_PARTS && centipedes[i].icon == NO_BODY; i++);
+	cma#	NUM_PARTS
+	jge	hitCentipede5
+	mul#	SIZEOF_CENTIPEDE
+	tax
+	lda& !	hitCentipedeCentipedes
+	cma#	NO_BODY
+	jne	hitCentipede5
+	inc !	hitCentipedeI	; i++
+	jmp	hitCentipede4
+hitCentipede5:	
+	lda !	hitCentipedeI
+	cma#	NUM_PARTS		; if(i < NUM_PARTS)
+	jge	hitCentipede6
+	mul#	SIZEOF_CENTIPEDE
+	tax
+	lda#	HEAD
+	sta& !	hitCentipedeCentipedes 	; centipedes[i].icon = HEAD;
+	jmp	hitCentipede9
+hitCentipede6:			; else
+	lda#	CENTIPEDE_DEAD	; return CENTIPEDE_DEAD;
+	jmp	hitCentipede10
+hitCentipede7:	; else BODY hit
+	lda#	NO_BODY
+	sta& !	hitCentipedeCentipedes
+hitCentipede9:
+	lda#	0
+hitCentipede10:
+	popx
+	fin#	1		; hitCentipede()
+	rtn
+
+
+KEYISR:  	PSHA
+	lda#	0
+	outb	KBD_CNTL
+	INB 	KBD_DATA
+	CMA#	QUIT
+	JNE	KEY1
+	HLT		; HALT IF x
+KEY1:	cma#	$1B	; escape so cursor?
+	jeq	key2
+	cma#	FIRE
+	jne	keydone
+	psh	wandX
+	psh#	sparkXs
+	jsr	fireWand
+	ads#	2
+	jmp 	keydone
+KEY2:	inb	kbd_data	
+	cma#	LEFT_ARROW	; if left arrow
+	jeq	Key3
+	cma#	RIGHT_ARROW	; if right arrow
+	jne	keydone
+key3:	psha
+	psh#	wandx
+	jsr 	moveWand
+	ads#	2
+Keydone:	lda#	INTERRUPT_ENA
+	outb	KBD_CNTL
+	POPA		
+	IRTN		; KeyISR()
+
+
+
+; void moveAtLeftBorder(Centipede *cptr, int *direction)
+	.equ	moveAtLeftBorderCPtr, 3
+	.equ	moveAtLeftBorderDirection, 2
+moveAtLeftBorder:
+	bgn#	0
+	psha
+	pshx
+	lda#	RIGHT
+	sta* !	moveAtLeftBorderDirection
+	ldx#	Y_POS
+	lda& !	moveAtLeftBorderCPtr
+	cma#	BOTTOM		; if(cptr->y < BOTTOM)
+	jge	moveAtLeftBorder2
+	inc& !	moveAtLeftBorderCPtr	;  cptr->y++;
+	jmp	moveAtLeftBorder3
+moveAtLeftBorder2:
+	ldx#	X_POS
+	inc& !	moveAtLeftBorderCPtr	;  cptr->x++;
+moveAtLeftBorder3:
+	popx
+	popa
+	fin#	0
+	rtn		; moveAtLeftBorder()
+
+
+; void moveAtRightBorder(Centipede *cptr, int *direction)
+	.equ	moveAtRightBorderCPtr, 3
+	.equ	moveAtRightBorderDirection, 2
+moveAtRightBorder:
+	bgn#	0
+	psha
+	pshx
+	lda#	LEFT
+	sta* !	moveAtRightBorderDirection
+	ldx#	Y_POS
+	lda& !	moveAtRightBorderCPtr
+	cma#	BOTTOM		; if(cptr->y < BOTTOM)
+	jge	moveAtRightBorder2
+	inc& !	moveAtRightBorderCPtr	;  cptr->y++;
+	jmp	moveAtRightBorder3
+moveAtRightBorder2:
+	ldx#	X_POS
+	dec& !	moveAtLeftBorderCPtr	;  cptr->x--;
+moveAtRightBorder3:	
+
+	popx
+	popa
+	fin#	0
+	rtn		; moveAtRightBorder()
+
+
+; int moveCentipede(Centipede centipedes[], int *direction)
+	.equ moveCentipedeCentipedes, 5
+	.equ moveCentipedeDirection, 4
+	.equ moveCentipedeHeadPos, 1
+	.equ moveCentipedeI, 0
+moveCentipede:
+	bgn# 	2
+	pshx
+	lda# 	0
+	clr ! 	moveCentipedeHeadPos
+moveCentipede1:		;for(headPos = 0; centipedes[headPos].icon != HEAD; headPos++); // find HEAD
+	lda ! 	moveCentipedeHeadPos
+	mul# 	SIZEOF_CENTIPEDE
+	tax
+	lda& !	moveCentipedeCentipedes	; centipedes[headPos].icon
+	cma#	HEAD
+	jeq	moveCentipede2
+	inc !	moveCentipedeHeadPos
+	jmp	moveCentipede1
+moveCentipede2:		
+	lda !	moveCentipedeHeadPos
+	sta !	moveCentipedeI
+moveCentipede3:		; for(i = headPos; i < NUM_PARTS; i++)
+	lda !	moveCentipedeI
+	cma#	NUM_PARTS
+	jeq	moveCentipede4
+	mul#	SIZEOF_CENTIPEDE
+	ada#	ICON_BELOW_POS
+	tax	
+	lda& !	moveCentipedeCentipedes
+	psha
+	sbx#	ICON_BELOW_POS - X_POS
+	lda& !	moveCentipedeCentipedes
+	psha
+	adx#	Y_POS - X_POS
+	lda& !	moveCentipedeCentipedes
+	psha
+	jsr	putChar	; putChar(centipedes[i].icon_below, centipedes[i].x, centipedes[i].y);
+	ads#	3
+	inc !	moveCentipedeI
+	jmp	moveCentipede3
+moveCentipede4:
+	lda#	NUM_PARTS - 1
+	sta !	moveCentipedeI	; i = NUM_PARTS - 1
+moveCentipede5:			; for(i = NUM_PARTS - 1; i > headPos; i--)
+	lda !	moveCentipedeI
+	cma !	moveCentipedeHeadPos
+	jle	moveCentipede7	; i < NUM_PARTS?
+	sba#	1
+	mul#	SIZEOF_CENTIPEDE
+	ada#	X_POS
+	tax
+	lda& !	moveCentipedeCentipedes	
+	adx#	SIZEOF_CENTIPEDE
+	sta& !	moveCentipedeCentipedes	; centipedes[i].x = centipedes[i - 1].x;
+	psha			; centipedes[i].x
+	sbx#	SIZEOF_CENTIPEDE - 1
+	lda& !	moveCentipedeCentipedes
+	adx#	SIZEOF_CENTIPEDE
+	sta& !	moveCentipedeCentipedes	; centipedes[i].y = centipedes[i - 1].y
+	psha			; centipedes[i].y
+	jsr	getChar		
+	ads#	2
+	adx#	ICON_BELOW_POS - Y_POS	
+	sta& !	moveCentipedeCentipedes	; centipedes[i].icon_below = getChar(centipedes[i].x, centipedes[i].y);
+	sbx#	ICON_BELOW_POS - ICON_POS
+	lda& !	moveCentipedeCentipedes
+	cma#	NO_BODY
+	jeq	moveCentipede6	; if(centipedes[i].icon != NO_BODY)?
+	psha	
+	adx#	X_POS - ICON_POS
+	lda& ! 	moveCentipedeCentipedes
+	psha
+	adx#	Y_POS - X_POS
+	lda& !	moveCentipedeCentipedes
+	psha
+	jsr	putChar
+	ads#	3
+moveCentipede6:
+	dec !	moveCentipedeI	; --i
+	jmp	moveCentipede5
+moveCentipede7:	
+	lda !	moveCentipedeHeadPos
+	mul#	SIZEOF_CENTIPEDE
+	ada !	moveCentipedeCentipedes
+	psha
+	lda !	moveCentipedeDirection
+	psha
+	jsr	moveHead
+	ads#	2
+	popx
+	fin#	2	; moveCentipede()
+	rtn
+
+; int moveHead(Centipede *headPtr, int *direction)
+
+	.equ	moveHeadHeadPtr, 4
+	.equ	moveHeadDirection, 3
+	.equ	moveHeadX, 0
+
+moveHead:	bgn# 	1
+	pshx
+	lda* !	moveHeadDirection
+	cma#	RIGHT
+	ldx#	X_POS
+	lda& !	moveHeadHeadPtr
+	jne 	moveHead2
+	ada#	1	; headPtr->x + 1;
+	jmp	moveHead3
+moveHead2:	sba#	1	; headPtr->x - 1;
+moveHead3:	sta !	moveHeadX
+	cma#	MAX_RIGHT	; if(x > MAX_RIGHT)
+	jle	moveHead4
+	lda !	moveHeadHeadPtr
+	psha
+	lda !	moveHeadDirection
+	psha
+	jsr	moveAtRightBorder
+	ads#	2
+	jmp	moveHead8
+moveHead4:	cma#	0
+	jge	moveHead5	; if(x < 0)?
+	lda !	moveHeadHeadPtr
+	psha
+	lda !	moveHeadDirection
+	psha
+	jsr	moveAtLeftBorder
+	ads#	2
+	jmp	moveHead8
+moveHead5:	psha		; x
+	ldx#	Y_POS
+	lda& !	moveHeadHeadPtr
+	psha		; headPtr->y
+	jsr	getChar
+	ads#	2
+	cma#	MUSHROOM
+	jne	moveHead6
+	ldx#	Y_POS
+	inc& !	moveHeadHeadPtr 	; headPtr->y++
+	jmp	moveHead8
+moveHead6:	lda !	moveHeadX
+	ldx#	X_POS
+	sta& !	moveHeadHeadPtr
+moveHead8:	ldx#	X_POS
+	lda& !	moveHeadHeadPtr
+	psha	; headPtr->x
+	ldx#	Y_POS
+	lda& !	moveHeadHeadPtr
+	psha	; headPtr->y
+	jsr	getChar
+	ads#	2
+	ldx#	ICON_BELOW_POS
+	sta& !	moveHeadHeadPtr	; headPtr->icon_below = getChar(headPtr->x, headPtr->y);
+	psh#	HEAD
+	ldx#	X_POS
+	lda& !	moveHeadHeadPtr
+	psha
+	ldx#	Y_POS
+	lda& !	moveHeadHeadPtr
+	psha
+	jsr 	putChar
+	ads#	3
+	ldx#	ICON_BELOW_POS
+	lda& !	moveHeadHeadPtr
+	cma#	WAND		
+	jne	moveHead9		; if(headPtr->icon_below == WAND)
+	lda#	WAND_DEAD		; return WAND_DEAD;
+	jmp	moveHead11
+moveHead9:	cma#	SPARK
+	jne	moveHead10
+	lda#	SPACE
+	sta& !	moveHeadHeadPtr	; headPtr->icon_below = SPACE;
+moveHead10:	lda#	0		; return 0
+moveHead11:	popx
+	fin#1
+	rtn			; moveHead()
+
+; int moveSpark(Centipede centipedes[NUM_PARTS], int sparkXs[CRT_ROWS], int y)
+	.equ	moveSparkCentipedes, 6
+	.equ	moveSparkSparkXs, 5
+	.equ	moveSparkY, 4
+	.equ	moveSparkY1, 1
+	.equ	moveSparkX, 0
+moveSpark:	bgn#	2
+	pshx
+	lda !	moveSparkY
+	tax
+	sba#	1
+	sta !	moveSparkY1
+	lda& !	moveSparkSparkXs
+	sta ! 	moveSparkX
+	psha			; x
+	lda#	NO_SPARK
+	sta& !	moveSparkSparkXs
+	lda !	moveSparkY
+	psha			; y
+	jsr	getChar		; getChar(x, y)
+	ads#	2
+	cma#	SPARK	; if(crt[y][x] == SPARK)
+	jne	moveSpark1
+	psh#	SPACE
+	psh !	moveSparkX
+	psh ! 	moveSparkY
+	jsr 	putChar	; putChar( SPACE, x, y)
+	ads#	3
+moveSpark1:	lda !	moveSparkY
+	cma#	0	
+	jle	moveSparkDone	; if y > 0
+	lda !	moveSparkX
+	psha			; x
+	lda !	moveSparkY1
+	psha			; y1
+	jsr	getChar
+	ads#	2		; getChar(x, y1)
+	cma#	SPACE	
+	jne	moveSpark2	 ; if crt[y1][x] ==  SPACE
+	lda !	moveSparkX
+	ldx !	moveSparkY1
+	sta& !	moveSparkSparkXs
+	psh#	SPARK
+	psh !	moveSparkX
+	psh !	moveSparkY1
+	jsr	putChar
+	ads#	3
+	jmp	moveSparkDone
+moveSpark2:	cma#	BODY
+	jeq	moveSpark3
+	cma#	HEAD
+	jeq	moveSpark3
+	jmp 	moveSparkDone	
+moveSpark3:	psh !	moveSparkCentipedes
+	psh !	moveSparkX
+	psh !	moveSparkY1
+	jsr	hitCentipede
+	ads#	3
+	jmp	moveSpark4
+moveSparkDone:	lda#	0	; return 0
+moveSpark4:	popx
+	fin#	2
+	rtn
+
+; void moveWand(char key, int *wandX)
+	.equ	moveWandKey, 3
+	.equ	moveWandWandX, 2
+moveWand:	bgn#	0
+	psha
+	pshx
+	psh#	SPACE
+	psh* !	moveWandWandX
+	psh#	BOTTOM
+	jsr	putChar
+	ads#	3
+	lda !	moveWandKey
+	cma#	LEFT_ARROW
+	jne	moveWand2
+	lda* !	moveWandWandX
+	cma#	0
+	jle	moveWand2
+	sba#	1
+	psha		; *wandX - 1
+	psh#	BOTTOM
+	jsr	getChar	; getChar(*wandX - 1, BOTTOM)
+	ads#	2
+	cma#	SPACE
+	jne	moveWand2
+	dec* !	moveWandWandX
+	jmp	moveWand3
+moveWand2:	lda !	moveWandKey
+	cma#	RIGHT_ARROW
+	jne	moveWand3
+	lda* !	moveWandWandX
+	cma#	MAX_RIGHT
+	jge	moveWand3
+	ada#	1
+	psha		; *wandX + 1
+	psh#	BOTTOM	
+	jsr	getChar	; getChar(*wandX + 1, BOTTOM)
+	ads#	2
+	cma#	SPACE
+	jne	moveWand3
+	inc* !	moveWandWandX	; *wandX = *wandX + 1
+moveWand3:	psh#	WAND
+	psh* !	moveWandWandX
+	psh#	BOTTOM
+	jsr	putChar
+	ads#	3
+	popx
+	popa
+	fin#	0
+	rtn
+	
+;int play(Centipede centipedes[], int sparkXs[], int *direction)
+	.equ	playCentipedes, 5
+	.equ	playSparkXs, 4
+	.equ	playDirection, 3
+	.equ	playY, 0
+play:	bgn#	1
+	pshx
+	psh ! 	playCentipedes
+	psh ! 	playDirection
+	jsr 	moveCentipede	; if(moveCentipede(centipedes, direction) == WAND_DEAD)
+	ads# 2
+	cma#	WAND_DEAD
+	jeq	playDone	; return WAND_DEAD
+	clr ! 	playY	; y = 0
+play1:	lda !	playY	; for(y = 0; y < CRT_ROWS; y++)
+	cma#	CRT_ROWS
+	jge	play3
+	tax
+	lda& !	playSparkXs
+	cma#	NO_SPARK
+	jeq	play2
+	psh !	playCentipedes
+	psh !	playSparkXs
+	pshx
+	jsr 	moveSpark
+	ads# 	3
+	cma#	CENTIPEDE_DEAD	; if(moveSpark(centipedes, sparkXs, y) == CENTIPEDE_DEAD)
+	jeq	playDone		; return CENTIPEDE_DEAD
+play2:	inc !	playY		; y++
+	jmp 	play1
+play3:	lda#	0
+playDone:	popx
+	fin#	1
+	rtn	; play()
+
+
+; void putChar(char c, int x, int y)
+	.EQU	putCharC, 5
+	.EQU	putCharX, 4
+	.EQU	putCharY, 3
+	.EQU	putCharTemp, 0
+
+putChar:	bgn#	1
+	psha
+	lda !	putCharY
+	mul#	CRT_COLS
+	ada !	putCharX
+	ada#	CRT_BUFFER
+	sta !	putCharTemp
+	lda !	putCharC
+	outb* !	putCharTemp
+	popa
+	fin#	1
+	rtn
+
+; int random(int max) leaves result in accumulator!
+	.equ	randomMax, 2
+	
+random:	bgn#	0
+	lda	SEED
+	mul#	2789
+	ada#	1997
+	mod#	2048
+	sta	SEED
+	inc !	randomMax
+	mod !	randomMax
+	fin#	0
+	rtn
+	
+
+;void showIntro()
+showIntro:	BGN#	0
+	psha
+	lda#	CLEAR_DISPLAY
+	outb	CRT_CNTL
+	psh#	intro1Len
+	psh#	intro1
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro2Len
+	psh#	intro2
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro3Len
+	psh#	intro3
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro4Len
+	psh#	intro4
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro5Len
+	psh#	intro5
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro6Len
+	psh#	intro6
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro7Len
+	psh#	intro7
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro8Len
+	psh#	intro8
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	psh#	intro9Len
+	psh#	intro9
+	jsr 	PUT_STR
+	ads#	2
+	jsr	PUT_NL
+	lda#	KBD_FLUSH
+	outb	KBD_CNTL
+showIntro2:	inb	KBD_STAT
+	jeq	showIntro2	
+	inb	KBD_DATA
+	cma#	START
+	jne	showIntro2
+	popa
+	FIN#	0
+	rtn	; showIntro()
+
+
+
+; void showOutcome(int retval)
+	.equ showOutcomeRetval, 2
+	
+showOutcome: bgn#	0
+	pshx
+	lda#	1
+	outb	CRT_YREG
+	lda#	8
+	outb	CRT_XREG
+	lda !	showOutcomeRetval
+	cma#	CENTIPEDE_DEAD	 ;if(retval == CENTIPEDE_DEAD)
+	jne	showOutcome2
+	psh#	centipedeDeadStrLen
+	psh#	centipedeDeadStr	;"Game Over.  Centipede is dead.")
+	jmp 	showOutcome3
+showOutcome2:			; else
+	psh#	wandEatenStrLen
+	psh#	wandEatenStr		; Game Over.  Wand is eaten!");
+showOutcome3:
+	jsr	put_str		; mvaddstr(1, 8, "Game Over ... "
+	ads#	2
+	lda#	WINNER_DELAY
+	sta	TIMER_CNT	;while(advanceTime(10000)); // show Game Over for 5 seconds
+	popx
+	fin#	0
+	rtn	; // showOutcome()
+
+
+;void startCentipede(Centipede centipedes[6], int *direction)
+	.equ	startCentipedeCentipedes, 5
+	.equ	startCentipedeDirection, 4
+	.equ	startCentipedeX, 1
+	.equ	startCentipedeI, 0
+
+startCentipede:
+	BGN#	2
+	psha
+	pshx
+	psh#	1
+	jsr	random
+	ads#	1
+	ada#	LEFT
+	sta* !	startCentipedeDirection
+	psh#	30
+	jsr	random
+	ads#	1
+	ada#	1
+	sta !	startCentipedeX
+	lda* !	startCentipedeDirection
+	cma#	RIGHT
+	jne	startCentipede2
+	lda !	startCentipedeX
+	ada#	5
+	sta !	startCentipedeX
+startCentipede2:
+	lda#	0
+	sta !	startCentipedeI	; i = 0
+startCentipede3:			; for(i = 0; i < 6; i++)
+	lda !	startCentipedeI
+	cma#	NUM_PARTS
+	jeq	startCentipede6
+	mul#	SIZEOF_CENTIPEDE	; XR = i * sizeof(Centipede)
+	tax
+	lda#	BODY
+	sta& !	startCentipedeCentipedes	; centipedes[i].icon = BODY
+	adx#	1
+	lda* !	startCentipedeDirection
+	cma#	LEFT
+	lda !	startCentipedeX
+	jne	startCentipede4
+	ada !	startCentipedeI
+	jmp	startCentipede5
+startCentipede4:
+	sba !	startCentipedeI
+startCentipede5:
+	sta& !	startCentipedeCentipedes	; centipedes[i].x = x +- i
+	psh#	BODY
+	psha				; centipedes[i].x
+	psh#	TOP
+	jsr 	putChar
+	ads#	3
+	adx#	1
+	lda#	TOP
+	sta& !	startCentipedeCentipedes	; centipedes[i].y = TOP
+	adx#	1
+	lda#	SPACE		
+	sta& !	startCentipedeCentipedes	; centipedes[i]. icon_below = ' '
+	inc !	startCentipedeI
+	jmp	startCentipede3	
+startCentipede6:	
+	lda#	HEAD
+	ldx#	0
+	sta& !	startCentipedeCentipedes	; centipedes[0].icon = HEAD
+	psh#	HEAD
+	ldx#	1
+	lda& !	startCentipedeCentipedes	; centipedes[0].x
+	psha
+	psh#	TOP
+	jsr	putChar
+	ads#	3
+	popx
+	popa
+	fin#	2
+	rtn	; startCentipede()
+	
+
+;void startGame(Centipede centipedes[6], int sparkXs[14], int wandX,
+;  int *direction);
+
+	.equ	startGameCentipedes, 7
+	.equ	startGameSparkXs, 6
+	.equ	startGameWandX, 5
+	.equ	startGameDirection, 4
+	.equ	startGameX, 1
+	.equ	startGameY, 0
+startGame:  BGN#	2
+	PSHA
+	PSHX
+	LDA#	PLAY_DELAY
+	STA	TIMER_CNT
+	LDA#	CLEAR_DISPLAY
+        	OUTB	CRT_CNTL	; CLEAR SCREEN
+	ldx#	CRT_ROWS - 1
+	lda#	NO_SPARK
+startGame2:	sta& !	startGameSparkXs	;sparkXs[i] = NO_SPARK
+	soj	startGame2
+	psh !	startGameCentipedes
+	psh !	startGameDirection
+	jsr	startCentipede
+	ads#	2
+	ldx#	20
+startGame3: psh#	11
+	jsr	random
+	ads#	1
+	ada#	1
+	sta !	startGameY
+	psh#	CRT_COLS - 1
+	jsr	random
+	ads#	1
+	sta !	startGameX
+	psh#	5
+	jsr	random
+	ads#	1
+	psh#	MUSHROOM
+	psh !	startGameX
+	psh !	startGameY
+	jsr	putChar
+	ads#	3
+	soj	startGame3
+	psh#	WAND
+	psh !	startGameWandX
+	psh#	BOTTOM
+	jsr	putChar
+	ads#	3
+	popx
+	popa
+	fin#	2
+	RTN	; startGame()
+
+
+TIMERISR: 	PSHA
+          	INC       	TIMER
+          	lda	Timer
+	cma	TIMER_CNT
+	jlt	TIMER_DONE
+	cma#	WINNER_DELAY
+	jne	timerISR1
+	hlt		; After WINNER_DELAY halt
+timerISR1:	psh#	centipedes
+	psh#	sparkXs
+	psh#	direction
+	jsr 	play
+	ads#	3	
+	cma#	0
+	jeq	timerISR3
+	psha
+	jsr	showOutcome
+	ads#	1
+timerISR3:	clr	Timer	; reset timer count
+TIMER_DONE: LDA#      	ENABLE_AND_RESET
+          	OUTB      	TIM_CNTL
+          	POPA
+          	IRTN		; END OF TIMERISR
+
+
+
+	.equ @, $500	
+TIMER_CNT:	.WORD	PLAY_DELAY
+SEED:	.WORD	0
+KEY:	.WORD	
+DELAY:    	.WORD     	200000
+TIMER:	.WORD 	0
+wandX:	.WORD
+direction:	.WORD
+centipedes:	.BLKW 24	; icon = [0], x = [1], y = [2], icon_below = [3]
+sparkXs:	.BLKW 14
+intro1:	.char 'Centipede Introduction', intro1Len
+intro2:	.char 'This is the minimal version of', intro2Len
+intro3:	.char 'centipede.  The game starts when the', intro3Len
+intro4:  	.char 'enter key is pressed.  The game', intro4Len
+intro5:  	.char 'ends when either the user presses x', intro5Len
+intro6:  	.char 'the centipede is killed, or the wand', intro6Len
+intro7:  	.char 'is eaten.  Instead of this', intro7Len
+intro8:  	.char 'introduction, students should place a', intro8Len
+intro9:  	.char 'description of their options here.', intro9Len
+killed: 	.char 'Game Over.  Centipede is dead.', killedLen
+eaten:	.char 'Game Over.  Wand is eaten!', eatenLen
+centipedeDeadStr:	.char 'Game Over.  Centipede is dead.', centipedeDeadStrLen
+wandEatenStr:	.char 'Game Over.  Wand is eaten!', wandEatenStrLen
+
+
+

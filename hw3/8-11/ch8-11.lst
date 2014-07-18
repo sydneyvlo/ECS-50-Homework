@@ -1,0 +1,144 @@
+LINE ADDR CONTENTS SOURCE LINE
+  1.              ; Sydney
+  2.              ; Assignment 8-11
+  3.              ; 7/16/2014
+  4.              
+  5.              ; Mini OS	
+  6.              	.equ	PUT_NUM,	$E00
+  7.              	.equ	GET_NUM,	$E01
+  8.              	.equ	PUT_STR,	$E05
+  9.              	.equ	PUT_NL,	$E06
+ 10.              	.equ	PUT_NUM2,	$E07
+ 11.              	.equ	PUT_CHR,	$E08
+ 12.              
+ 13.              ; Misc
+ 14.              	.equ stackTop,	$E00
+ 15.              	.equ	next_line_value,	$05
+ 16.              
+ 17.              ; Tapedrive
+ 18.              	.equ	tdr_cntl,	$020
+ 19.              	.equ	tdr_stat,	$020
+ 20.              	.equ	tdr_len,	$021
+ 21.              	.equ	tdr_addr,	$022
+ 22.              
+ 23.              	.equ	read_bits,	$10 ; 0001 0000, 01 - read a record
+ 24.              	.equ	mounted_bits,	$20 ; 0010 0000
+ 25.              	.equ	eot_bit,	$08 ; 0000 1000
+ 26.              
+ 27.              ; Printer
+ 28.              	.equ	p_stat,	$010
+ 29.              	.equ	p_cntl,	$010
+ 30.              	.equ	p_data,	$011
+ 31.              	.equ	p_ready,	$80
+ 32.              	.equ	p_int_enab,	$70
+ 33.              	.equ	p_enab_clr,	$C0
+ 34.              	.equ p_mounted,	$20	; 0010 0000
+ 35.              
+ 36.              ; Implementation: Produce a program that copies a tape to the printer.
+ 37.              ; Produce message if no tape is mounted or if the printer is off-line.
+ 38.              ; If your program functions correctly, the printer file produced
+ 39.              ; should match the tape filed used.
+ 40.              
+ 41.              ; User Code
+ 42.              
+ 43.  000 020E00  	lds#	stackTop	; SP = $E00
+ 44.              	
+ 45.  001 702020  main:	inb	tdr_stat	; lower 8 bits of the acc is filled with the status of the tape
+ 46.  002 4B2011  	jge	badTape	; LT flag is filled with the msb, and jump if the lt flag is 0.
+ 47.  003 000032  	lda#	buffer
+ 48.  004 732022  	outw	tdr_addr	; Put the address of the buffer into the transfer address port
+ 49.              
+ 50.  005 702010  printer:	inb	p_stat	; acc = m[p_stat]
+ 51.  006 300020  	and#	p_mounted
+ 52.  007 48201D  	jeq	badPrinter
+ 53.              
+ 54.  008 00001E  next_rec:	lda#	b_size
+ 55.  009 712021  	outb	tdr_len	; Put the size of the transfer length in the transfer length port
+ 56.  00A 000010  	lda#	read_bits	; read a record
+ 57.  00B 712020  	outb	tdr_cntl	; initialize the read record.
+ 58.              
+ 59.  00C 702020  poll:	inb	tdr_stat
+ 60.  00D 4A2016  	jlt	complete	; jump if the tape isnt ready
+ 61.  00E 300020  	and#	mounted_bits	; checks that the tape is still mounted If the result of this is 000000, that means that bit 5 wasnt set. The eq is set if the result is 000000
+ 62.  00F 482011  	jeq	badTape	; halt the program if the tape is no longer mounted.
+ 63.  010 40200C  	jmp	poll
+ 64.              
+ 65.  011 080016  badTape:	psh#	t_prompt1Len
+ 66.  012 080045  	psh#	t_prompt1
+ 67.  013 412E05  	jsr	PUT_STR
+ 68.  014 120002  	ads#	2
+ 69.  015 402031  	jmp	stop
+ 70.              
+ 71.  016 300008  complete:	and#	eot_bit
+ 72.  017 492031  	jne	stop
+ 73.  018 702021  	inb	tdr_len	; acc = m[tdr_len]
+ 74.  019 482029  	jeq	new_line	; if the length is 0
+ 75.  01A 04203C  	sta	count	; count = m[tdr_len]
+ 76.  01B 010000  	ldx#	0
+ 77.  01C 402022  	jmp	copy_char
+ 78.              
+ 79.  01D 080013  badPrinter:	psh#	p_prompt1Len
+ 80.  01E 08003E  	psh#	p_prompt1
+ 81.  01F 412E05  	jsr	PUT_STR
+ 82.  020 120002  	ads#	2
+ 83.  021 402031  	jmp	stop
+ 84.              
+ 85.  022 702010  copy_char:	inb	p_stat
+ 86.  023 300080  	and#	p_ready
+ 87.  024 482022  	jeq	copy_char
+ 88.  025 502032  	ldc	buffer
+ 89.  026 712011  	outb	p_data
+ 90.  027 60203C  	aoc	count
+ 91.  028 4A2022  	jlt	copy_char
+ 92.              
+ 93.  029 702010  new_line:	inb	p_stat
+ 94.  02A 300080  	and#	p_ready
+ 95.  02B 482029  	jeq	new_line
+ 96.  02C 00000D  	lda#	$0D
+ 97.  02D 712011  	outb	p_data
+ 98.  02E 00000A  	lda#	$0A
+ 99.  02F 712011  	outb	p_data
+100.  030 402008  	jmp	next_rec
+101.              
+102.  031 FFFFFF  stop:	hlt
+103.              
+104.              
+105.              
+106.              ; Variables
+107.              	.equ	b_size,	30	; max characters per record
+108.  032 FFFFFFFFFFFFFFFF  buffer:	.blkw	(b_size+2)/3 ; buffer length is rounded up
+109.  03C FFFFFFFFFFFFFFFF  count:	.blkw	1	
+110.  03D 0D0A20  newline:	.char	'\CR\LF', newlineLen
+      03E 507269
+111.  03E 507269  p_prompt1:	.char	'Printer is offline.', p_prompt1Len
+      03F 6E7465
+      040 722069
+      041 73206F
+      042 66666C
+      043 696E65
+      044 2E2020
+112.  045 546170  t_prompt1:	.char	'Tape drive is offline.', t_prompt1Len
+      046 652064
+      047 726976
+      048 652069
+      049 73206F
+      04A 66666C
+      04B 696E65
+      04C 2E2020
+
+                     SYMBOL TABLE CONTENTS
+
+00001D = BADPRINTER      000011 = BADTAPE         000032 = BUFFER          
+00001E = B_SIZE          000016 = COMPLETE        000022 = COPY_CHAR       
+00003C = COUNT           000008 = EOT_BIT         000E01 = GET_NUM         
+000001 = MAIN            000020 = MOUNTED_BITS    00003D = NEWLINE         
+000002 = NEWLINELEN      000029 = NEW_LINE        000005 = NEXT_LINE_VALUE 
+000008 = NEXT_REC        00000C = POLL            000005 = PRINTER         
+000E08 = PUT_CHR         000E06 = PUT_NL          000E00 = PUT_NUM         
+000E07 = PUT_NUM2        000E05 = PUT_STR         000010 = P_CNTL          
+000011 = P_DATA          0000C0 = P_ENAB_CLR      000070 = P_INT_ENAB      
+000020 = P_MOUNTED       00003E = P_PROMPT1       000013 = P_PROMPT1LEN    
+000080 = P_READY         000010 = P_STAT          000010 = READ_BITS       
+000E00 = STACKTOP        000031 = STOP            000022 = TDR_ADDR        
+000020 = TDR_CNTL        000021 = TDR_LEN         000020 = TDR_STAT        
+000045 = T_PROMPT1       000016 = T_PROMPT1LEN    

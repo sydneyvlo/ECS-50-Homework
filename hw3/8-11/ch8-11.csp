@@ -1,0 +1,112 @@
+; Sydney
+; Assignment 8-11
+; 7/16/2014
+
+; Mini OS	
+	.equ	PUT_NUM,	$E00
+	.equ	GET_NUM,	$E01
+	.equ	PUT_STR,	$E05
+	.equ	PUT_NL,	$E06
+	.equ	PUT_NUM2,	$E07
+	.equ	PUT_CHR,	$E08
+
+; Misc
+	.equ stackTop,	$E00
+	.equ	next_line_value,	$05
+
+; Tapedrive
+	.equ	tdr_cntl,	$020
+	.equ	tdr_stat,	$020
+	.equ	tdr_len,	$021
+	.equ	tdr_addr,	$022
+
+	.equ	read_bits,	$10 ; 0001 0000, 01 - read a record
+	.equ	mounted_bits,	$20 ; 0010 0000
+	.equ	eot_bit,	$08 ; 0000 1000
+
+; Printer
+	.equ	p_stat,	$010
+	.equ	p_cntl,	$010
+	.equ	p_data,	$011
+	.equ	p_ready,	$80
+	.equ	p_int_enab,	$70
+	.equ	p_enab_clr,	$C0
+	.equ p_mounted,	$20	; 0010 0000
+
+; Implementation: Produce a program that copies a tape to the printer.
+; Produce message if no tape is mounted or if the printer is off-line.
+; If your program functions correctly, the printer file produced
+; should match the tape filed used.
+
+; User Code
+
+	lds#	stackTop	; SP = $E00
+	
+main:	inb	tdr_stat	; lower 8 bits of the acc is filled with the status of the tape
+	jge	badTape	; LT flag is filled with the msb, and jump if the lt flag is 0.
+	lda#	buffer
+	outw	tdr_addr	; Put the address of the buffer into the transfer address port
+
+printer:	inb	p_stat	; acc = m[p_stat]
+	and#	p_mounted
+	jeq	badPrinter
+
+next_rec:	lda#	b_size
+	outb	tdr_len	; Put the size of the transfer length in the transfer length port
+	lda#	read_bits	; read a record
+	outb	tdr_cntl	; initialize the read record.
+
+poll:	inb	tdr_stat
+	jlt	complete	; jump if the tape isnt ready
+	and#	mounted_bits	; checks that the tape is still mounted If the result of this is 000000, that means that bit 5 wasnt set. The eq is set if the result is 000000
+	jeq	badTape	; halt the program if the tape is no longer mounted.
+	jmp	poll
+
+badTape:	psh#	t_prompt1Len
+	psh#	t_prompt1
+	jsr	PUT_STR
+	ads#	2
+	jmp	stop
+
+complete:	and#	eot_bit
+	jne	stop
+	inb	tdr_len	; acc = m[tdr_len]
+	jeq	new_line	; if the length is 0
+	sta	count	; count = m[tdr_len]
+	ldx#	0
+	jmp	copy_char
+
+badPrinter:	psh#	p_prompt1Len
+	psh#	p_prompt1
+	jsr	PUT_STR
+	ads#	2
+	jmp	stop
+
+copy_char:	inb	p_stat
+	and#	p_ready
+	jeq	copy_char
+	ldc	buffer
+	outb	p_data
+	aoc	count
+	jlt	copy_char
+
+new_line:	inb	p_stat
+	and#	p_ready
+	jeq	new_line
+	lda#	$0D
+	outb	p_data
+	lda#	$0A
+	outb	p_data
+	jmp	next_rec
+
+stop:	hlt
+
+
+
+; Variables
+	.equ	b_size,	30	; max characters per record
+buffer:	.blkw	(b_size+2)/3 ; buffer length is rounded up
+count:	.blkw	1	
+newline:	.char	'\CR\LF', newlineLen
+p_prompt1:	.char	'Printer is offline.', p_prompt1Len
+t_prompt1:	.char	'Tape drive is offline.', t_prompt1Len
