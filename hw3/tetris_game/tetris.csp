@@ -140,7 +140,9 @@ rpLoop:	inb	kbd_stat
 ; Notes: Gets a key from the keyboard and returns the value in the accumulator
 ; if it is an acceptable character. If not it returns a noKey value.
 ; char getKey()
-getKey:	bgn#	0
+	.equ	gkLocal1,	1
+	.equ	gkLocal2,	0
+getKey:	bgn#	2
 gkLoop:	inb	kbd_stat	
 	jeq	gkLoop
 	inb	kbd_data	; if((key = getch()) != ERR)
@@ -155,7 +157,7 @@ gkLoop:	inb	kbd_stat
 	cma#	down_arrow
 	jeq	gkDone
 	lda#	noKey
-gkDone:	fin#	0
+gkDone:	fin#	2
 	rtn
 	
 ; User Variables
