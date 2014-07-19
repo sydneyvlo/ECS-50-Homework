@@ -1,0 +1,68 @@
+; Sydney Lo
+; Tetris
+; ECS 50 Summer 2014
+
+; Mini os
+	.equ put_num,	$e00
+	.equ	get_num,	$e01
+	.equ	get_str,	$e04
+	.equ	put_str,	$e05
+	.equ	put_nl,	$e06
+	.equ	put_num2,	$e07
+	.equ	put_chr,	$e08
+
+; Keyboard
+	.equ	kbd_cntl,	$000
+	.equ	kbd_stat,	$000
+	.equ	kbd_data,	$001
+	.equ	kbd_flush,	$40
+
+; Timer
+	.equ	tim_cntl,	$030
+	.equ	tim_stat,	$030
+	.equ	tim_value,	$031
+	.equ	tim_count,	$034
+; Actions for keyboard and timer
+	.equ	ena_int,	$80
+	.equ	res_ready_bit	$40
+	.equ	strt_aft_ld,	$10
+	.equ	ena_res_and_strt	$D0
+	.equ	ena_and_res	$C0
+
+; CRT
+	.equ	crt_buffer,	$100
+	.equ	crt_bot_rgt,	$313
+	.equ	crt_xreg,	$314
+	.equ	crt_yreg,	$315
+	.equ	crt_cntl,	$316
+	.equ	crt_data,	$317
+	.equ	crt_rows,	14
+	.equ	crt_cols,	38
+	.equ	crt_clr_dis,	$01
+	.equ	crt_home,	$04
+
+; Game Logistics
+	.equ	top,	0
+	.equ	bottom,	13
+	.equ	max_right,	37
+	.equ	left_arrow,	'K'
+	.equ	right_arrow,	'M'
+	.equ	up_arrow,	'H'
+	.equ	down_arrow,	'kP;
+	.equ	left,	0
+	.equ	right,	1
+	.equ	quit,	'x'
+	.equ	start,	13	; Enter key
+	.equ	nokey,	'n'
+	.equ	patternaddr,	0
+	.equ	rotation,	1
+	.equ	location,	2
+
+; Misc
+	.equ stackTop,	$e00
+
+; User Constants
+
+; Main
+
+; User Variables
