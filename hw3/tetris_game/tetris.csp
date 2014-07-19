@@ -201,6 +201,46 @@ random2:	bgn#	7
 	fin#	7
 	rtn		; return seed % (max + 1) ; in the accumulator
 
+;void startNewScreen(int score, Tetromino *tetromino)
+;{
+;  int x, y
+;
+;  erase();  // clear screen completely
+;  for(x = 0; x < 38; x++)
+;    for(y = 0; y < 14; y++)
+;      crt[y][x] = ' ';
+;
+;  mvaddstr(0,0,"------------");
+;  mvaddstr(1,14, "Score:");
+;  for(y = 0; y < 14; y++)
+;  {
+;    putChar('|', 0, y);
+;    putChar('|', 11, y);
+;  } // for y
+;
+;  mvaddstr(15,0,"------------");
+;  mvaddstr(16,0,"Horizontal borders are not in CUSP");
+;  showScore(score);
+;  startTetromino(tetromino);
+;  refresh();
+;} // StartNewScreen()
+; Notes:
+; Programmer notes:
+; void startNewScreen(int score, Tetromino *tetromino)
+	.equ score_i, 13
+	.equ	tetromino_i, 12
+	.equ snsLocal1, 10
+	; local variable ...
+startNewScreen:
+	bgn#	10
+	psha
+	pshx
+	lda#	crt_clr_dis	; erase()
+	outb	crt_cntl	; Fills it with spaces already done.
+	popx
+	popa
+	fin#	10
+
 
 	
 ; User Variables
@@ -222,3 +262,6 @@ intro9:	.char	'Press enter to start the game.', intro9Len
 multipiler:	.word	2789
 increment:	.word	1997
 modulus:	.word	2048
+tetroPattern:	.word
+tetroRotation:	.word
+tetroLocation:	.word
