@@ -11,6 +11,12 @@
 	.equ	put_num2,	$e07
 	.equ	put_chr,	$e08
 
+; ISR Jump Table
+	.equ	key_isr,	$FF8
+	.equ	print_isr,	$FF9
+	.equ	tape_isr,	$FFA
+	.equ	timer_isr,	$FFB
+
 ; Keyboard
 	.equ	kbd_cntl,	$000
 	.equ	kbd_stat,	$000
@@ -24,10 +30,10 @@
 	.equ	tim_count,	$034
 ; Actions for keyboard and timer
 	.equ	ena_int,	$80
-	.equ	res_ready_bit	$40
+	.equ	res_ready_bit,	$40
 	.equ	strt_aft_ld,	$10
-	.equ	ena_res_and_strt	$D0
-	.equ	ena_and_res	$C0
+	.equ	ena_res_and_strt,	$D0
+	.equ	ena_and_res,	$C0
 
 ; CRT	; char crt[14][38]
 	.equ	crt_buffer,	$100
@@ -64,6 +70,85 @@
 ; User Constants
 
 ; Main
+	lds#	stackTop
+	jsr	showIntro
+	hlt
+
+; Notes: Prints out the description of the game 
+; and instructions on starting the game.
+; Loops forever until the "enter" key is pressed.
+; void showIntro()
+showIntro:	bgn#	0
+	psha
+	pshx
+reprintP:	lda#	kbd_flush
+	outb	kbd_cntl
+	psh#	intro1Len	; mvaddstr(0, 5, "Tetris Introduction");
+	psh#	intro1
+	jsr	put_str
+	ads#2
+	jsr	put_nl
+	psh#	intro2Len	; mvaddstr(2, 0, "This is the minimal version of");
+	psh#	intro2
+	jsr	put_str
+	ads#2
+	jsr	put_nl
+	psh#	intro3Len
+	psh#	intro3	; mvaddstr(3, 0, "Tetris. The game starts when the");
+	jsr	put_str
+	ads#	2
+	jsr	put_nl
+	psh#	intro4Len	; mvaddstr(4, 0, "enter key is pressed. The game");
+	psh#	intro4
+	jsr	put_str
+	ads#	2
+	jsr	put_nl
+	psh#	intro5Len	; mvaddstr(5, 0, "ends when the user presses x.");
+	psh#	intro5
+	jsr	put_str
+	ads#	2
+	jsr	put_nl
+	psh#	intro6Len	; mvaddstr(6, 0, "Instead of this introduction, students");
+	psh#	intro6	; Do not need a newline here because it is already 38 characters long.
+	jsr	put_str
+	ads#	2
+	psh#	intro7Len	; mvaddstr(7, 0, "should place a description of their");
+	psh#	intro7
+	jsr	put_str
+	ads#	2
+	jsr put_nl
+	psh#	intro8Len	; mvaddstr(8, 0, "options here.");
+	psh#	intro8
+	jsr	put_str
+	ads#	2
+	jsr	put_nl
+	psh#	intro9Len	; mvaddstr(9, 0, "Press Enter to start the game.");
+	psh#	intro9
+	jsr	put_str
+	ads#	2
+	jsr	put_nl
+loop:	inb	kbd_stat
+	jeq	loop
+	inb	kbd_data
+	cma	enter
+	jne	reprintP	
+	popx
+	popa
+	fin#	0
+	rtn
 
 ; User Variables
 seed:	.word		; int seed;
+score:	.word		; int score;
+speed:	.word		; int speed;
+enter:	.word	$0D	; Enter key
+key:	.char	'n', keyLen	; char key = "n"
+intro1:	.char	'Tetris Introduction', intro1Len
+intro2:	.char	'This is the minimal version of', intro2Len
+intro3:	.char	'Tetris. The game starts when the', intro3Len
+intro4:	.char	'enter key is pressed. The game', intro4Len
+intro5:	.char	'ends when the user presses x.', intro5Len
+intro6:	.char	'Instead of this introduction, students', intro6Len
+intro7:	.char	'should place a description of their', intro7Len
+intro8:	.char	'options here.', intro8Len
+intro9:	.char	'Press enter to start the game.', intro9Len
