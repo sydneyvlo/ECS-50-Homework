@@ -72,7 +72,8 @@
 ; Main
 	lds#	stackTop
 	jsr	showIntro
-	hlt
+main:	jmp	main	; Main nop loop
+	hlt	; for testing purposes
 
 ; Notes: Prints out the description of the game 
 ; and instructions on starting the game.
