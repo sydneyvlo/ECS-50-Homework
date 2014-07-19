@@ -88,10 +88,11 @@ main:	jmp	main	; Main nop loop
 ; Loops forever until the "enter" key is pressed.
 ; Programmers note: I may need to remove the loop until the enter key is pressed let an ISR handle it.
 ; void showIntro().
-showIntro:	bgn#	0
+	.equ	key_i, 9
+showIntro:	bgn#	10
 	psha
 	pshx
-reprintP:	lda#	kbd_flush
+	lda#	kbd_flush
 	outb	kbd_cntl
 	psh#	intro1Len	; mvaddstr(0, 5, "Tetris Introduction");
 	psh#	intro1
@@ -139,12 +140,13 @@ reprintP:	lda#	kbd_flush
 	jsr	put_nl
 rpLoop:	inb	kbd_stat
 	jeq	rpLoop
-	jsr	getKey	
+	jsr	getKey
+	sta	key_i	
 	cma	enter
 	jne	rpLoop	
 	popx
 	popa
-	fin#	0
+	fin#	10
 	rtn
 ; Notes: Gets a key from the keyboard and returns the value in the accumulator
 ; if it is an acceptable character. If not it returns a noKey value.
@@ -195,6 +197,7 @@ random2:	bgn#	7
 	mod#	2048
 	inc	! max_i	; seed % (max + 1)
 	mod	! max_i
+	jsr	put_num	; testing
 	fin#	7
 	rtn		; return seed % (max + 1) ; in the accumulator
 
