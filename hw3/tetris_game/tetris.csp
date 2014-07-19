@@ -77,6 +77,7 @@
 ; Notes: Prints out the description of the game 
 ; and instructions on starting the game.
 ; Loops forever until the "enter" key is pressed.
+; Programmers note: I may need to remove the loop until the enter key is pressed let an ISR handle it.
 ; void showIntro()
 showIntro:	bgn#	0
 	psha
