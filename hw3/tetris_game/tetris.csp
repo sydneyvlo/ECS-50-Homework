@@ -29,7 +29,7 @@
 	.equ	ena_res_and_strt	$D0
 	.equ	ena_and_res	$C0
 
-; CRT
+; CRT	; char crt[14][38]
 	.equ	crt_buffer,	$100
 	.equ	crt_bot_rgt,	$313
 	.equ	crt_xreg,	$314
@@ -42,19 +42,19 @@
 	.equ	crt_home,	$04
 
 ; Game Logistics
-	.equ	top,	0
-	.equ	bottom,	13
-	.equ	max_right,	37
-	.equ	left_arrow,	'K'
+	.equ	top,	0	; const int top;
+	.equ	bottom,	13	; const int bottom;
+	.equ	max_right,	37	; const int max_right;
+	.equ	left_arrow,	'K'	; const int left
 	.equ	right_arrow,	'M'
 	.equ	up_arrow,	'H'
-	.equ	down_arrow,	'kP;
-	.equ	left,	0
-	.equ	right,	1
-	.equ	quit,	'x'
-	.equ	start,	13	; Enter key
-	.equ	nokey,	'n'
-	.equ	patternaddr,	0
+	.equ	down_arrow,	'P'
+	.equ	left,	0	; const int left;
+	.equ	right,	1	; const int right;
+	.equ	quit,	'x' 	; const int quit string(x)
+	.equ	start,	13	; const int start = string(\n)
+	.equ	nokey,	'n'	; const int nokey;
+	.equ	patternaddr,	0	; int patterns?
 	.equ	rotation,	1
 	.equ	location,	2
 
@@ -66,3 +66,4 @@
 ; Main
 
 ; User Variables
+seed:	.word		; int seed;
