@@ -71,6 +71,14 @@
 
 ; Main
 	lds#	stackTop
+	psh#	seedPromptLen
+	psh#	seedPrompt
+	jsr	put_str	; printf("Seed: ");
+	ads#	2	
+	jsr	get_num	; scanf("%d", &seed);
+	sta	seed
+	lda#	crt_clr_dis	; Clear the display
+	outb	crt_cntl
 	jsr	showIntro
 main:	jmp	main	; Main nop loop
 	hlt	; for testing purposes
@@ -79,7 +87,7 @@ main:	jmp	main	; Main nop loop
 ; and instructions on starting the game.
 ; Loops forever until the "enter" key is pressed.
 ; Programmers note: I may need to remove the loop until the enter key is pressed let an ISR handle it.
-; void showIntro()
+; void showIntro().
 showIntro:	bgn#	0
 	psha
 	pshx
@@ -160,9 +168,41 @@ gkLoop:	inb	kbd_stat
 	lda#	noKey
 gkDone:	fin#	2
 	rtn
+
+;int random2(int max)
+;{
+;  seed = (seed * 2789 + 1997) % 2048;
+;  return seed % (max + 1);
+;}  // random2()
+
+; Notes:
+; Programmer Notes:
+; int random2(int max)
+; 7 local variables
+; Seed value must be between 0 and 2047
+	.equ	max_i, 9
+	.equ	rLocal1, 6	; multiplier
+	.equ	rLocal2, 5	; increment
+	.equ	rLocal3, 4	; modulus
+	.equ rLocal4, 3	; seed
+	.equ	rLocal5, 2
+	.equ	rLocal6, 1
+	.equ	rLocal7, 0
+random2:	bgn#	7
+	lda	seed ; seed = (seed * 2789 + 1997) % 2048)
+	mul#	2789
+	ada#	1997
+	mod#	2048
+	inc	! max_i	; seed % (max + 1)
+	mod	! max_i
+	fin#	7
+	rtn		; return seed % (max + 1) ; in the accumulator
+
+
 	
 ; User Variables
 seed:	.word		; int seed;
+seedPrompt:	.char	'Seed', seedPromptLen
 score:	.word		; int score;
 speed:	.word		; int speed;
 enter:	.word	$0D	; Enter key
@@ -176,3 +216,6 @@ intro6:	.char	'Instead of this introduction, students', intro6Len
 intro7:	.char	'should place a description of their', intro7Len
 intro8:	.char	'options here.', intro8Len
 intro9:	.char	'Press enter to start the game.', intro9Len
+multipiler:	.word	2789
+increment:	.word	1997
+modulus:	.word	2048
