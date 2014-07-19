@@ -127,16 +127,36 @@ reprintP:	lda#	kbd_flush
 	jsr	put_str
 	ads#	2
 	jsr	put_nl
-loop:	inb	kbd_stat
-	jeq	loop
-	inb	kbd_data
+rpLoop:	inb	kbd_stat
+	jeq	rpLoop
+	jsr	getKey	
 	cma	enter
-	jne	reprintP	
+	jne	rpLoop	
 	popx
 	popa
 	fin#	0
 	rtn
-
+; Notes: Gets a key from the keyboard and returns the value in the accumulator
+; if it is an acceptable character. If not it returns a noKey value.
+; char getKey()
+getKey:	bgn#	0
+gkLoop:	inb	kbd_stat	
+	jeq	gkLoop
+	inb	kbd_data	; if((key = getch()) != ERR)
+	cma#	left_arrow
+	jeq	gkDone
+	cma#	right_arrow
+	jeq	gkDone
+	cma#	start
+	jeq	gkDone
+	cma#	up_arrow
+	jeq	gkDone
+	cma#	down_arrow
+	jeq	gkDone
+	lda#	noKey
+gkDone:	fin#	0
+	rtn
+	
 ; User Variables
 seed:	.word		; int seed;
 score:	.word		; int score;
