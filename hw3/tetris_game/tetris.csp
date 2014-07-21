@@ -197,7 +197,6 @@ random2:	bgn#	7
 	mod#	2048
 	inc	! max_i	; seed % (max + 1)
 	mod	! max_i
-	jsr	put_num	; testing
 	fin#	7
 	rtn		; return seed % (max + 1) ; in the accumulator
 
@@ -229,7 +228,7 @@ random2:	bgn#	7
 ; void startNewScreen(int score, Tetromino *tetromino)
 	.equ score_i, 13
 	.equ	tetromino_i, 12
-	.equ snsLocal1, 10
+	.equ snsLocal1, 9
 	; local variable ...
 startNewScreen:
 	bgn#	10
@@ -240,7 +239,110 @@ startNewScreen:
 	popx
 	popa
 	fin#	10
+	rtn
+;void startTetromino(Tetromino *tetromino)
+;{
+;    tetromino->location = random2(5) + 1;
+;    tetromino->pattern = random2(6);
+;    tetromino->rotation = 0;
+;    printTetromino(tetromino, 'X');
+;} // startTetromino()
+; Notes:
+; Programmer notes:
+; void startTetromino(Tetromino *tetromino)
+	.equ	stTetromino,	12
+	.equ	stLocal1,	9
+	bgn#	10
+	psha
+	pshx
+	psh#	5	; tetromino->location = random2(5) + 1
+	jsr	random2
+	ads#	1
+	ada#	1
+	ldx#	2
+	sta&	! stTetromino
+	ldx#	0	; tetromino->pattern = random2(6)
+	psh#	6
+	jsr	random2
+	ads#	1
+	sta&	! stTetromino
+	ldx#	1	; tetromino->rotation = 0
+	lda#	0
+	sta&	! stTetromino
+	jmp	printTetromino
+	popx
+	popa
+	fin#	10
+	rtn
 
+;void printTetromino(const Tetromino *tetromino, char letter)
+;{
+;   int i, pos;
+;
+;   for(i = 0; i < 4; i++)
+;   {
+;     pos = tetromino->location + patterns[tetromino->pattern][tetromino->rotation][i];
+;     putChar(letter, pos % 38, pos / 38);
+;   } // for i
+;}  // printTetromino()
+; tetroPattern:	.word 0
+; tetroRotation:	.word 1
+; tetroLocation:	.word 2
+; Notes:
+; Programmer notes:
+; void printTetromino(const Tetromino *tetromino, char letter)
+	.equ	ptTetromino,	13
+	.equ	ptLetter,	12
+	.equ	ptLocal1,	9
+	.equ	ptLocal2,	8
+	.equ	ptLocal3,	7
+	.equ	ptLocal4,	6
+printTetromino:
+	ldx#	0	;for(i = 0
+ptLoopSrt:	cmx#	4
+	jeq	ptLoopEnd
+	lda*	! ptTetromino + 2	; tetromino->location
+	sta	! ptLocal1		; pos = tetromino->location
+	lda*	! ptTetromino		; ptLocal2 = tetroPattern ; tetroPattern is rows
+	sta	! ptLocal2
+	lda*	! ptTetromino + 1	; ptLocal3 = tetroRotation ; tetroRotation is col
+	sta	! ptLocal3
+ptPatterns:	lda	! ptLocal2	; row addr = 16 * row
+	mul#	16
+	sta	! ptLocal2
+	lda	! ptLocal3	; col addr = (16 * row + 4 * col)
+	mul#	4
+	ada	! ptLocal2
+	sta	! ptLocal3
+	adx	! ptLocal3	; xr = xr = ptLocal3
+	lda+	patterns	; patterns[xr]
+	ada	! ptLocal1	; pos = tetromino->location + patterns[tetromino->patterns][teromino->rotation][i]
+	sta	! ptLocal4
+	psh	! ptLetter
+	mod#	38
+	psha
+	lda	! ptLocal4
+	div#	38
+	psha
+	jsr	putChar
+	ads#	3
+	adx#	1	; xr++	
+ptLoopEnd:	fin#	10
+	rtn
+	
+;void putChar(char c, int x, int y)
+;{
+;  crt[y][x] = c;
+;  mvaddch(y + 1, x, c);  // allow room for top border
+;  move(200,200);  // move cursor off screen
+;}  // putChar()
+; Notes:
+; Programmer notes:
+; void putChar(char c, int x, int y)
+putChar:
+	bgn#	10
+	fin#	10
+	rtn
 
 	
 ; User Variables
@@ -265,3 +367,122 @@ modulus:	.word	2048
 tetroPattern:	.word
 tetroRotation:	.word
 tetroLocation:	.word
+
+patterns:	.word 38	; row 1, col 1
+	.word 39	
+	.word  40
+	.word  41
+	.word 1	; row 1, col 2
+	.word 39
+	.word 77
+	.word  115
+	.word 38	; row 1, col 3
+	.word 39
+	.word  40
+	.word  41
+	.word 1	; row 1, col 4
+	.word  39
+	.word  77
+	.word  115
+    	; + 16 to hop rows, + 4 to hop columns
+	.word 1	; row 2, col 1
+	.word 39
+	.word  40
+	.word  41
+	.word 1	; row 2, col 2
+	.word 2
+	.word 39
+	.word 77
+	.word 38
+	.word 39
+	.word 40
+	.word 78 
+	.word 1
+	.word 39
+	.word  76
+	.word 77
+    
+	.word 2
+	.word 38
+	.word  39
+	.word  40
+	.word 1
+	.word 39
+	.word 77
+	.word 78
+	.word 38
+	.word  39
+	.word  40
+	.word 76
+	.word 0
+	.word  1
+	.word  39
+	.word  77
+    
+	.word 1
+	.word  2
+	.word  39
+	.word  40
+	.word 1
+	.word  2
+	.word  39
+	.word  40
+	.word 1
+	.word  2
+	.word  39
+	.word  40
+	.word 1
+	.word  2
+	.word  39
+	.word  40
+    
+	.word 1
+	.word  2
+	.word  38
+	.word  39
+	.word 1
+	.word  39
+	.word  40
+	.word  78
+	.word 1
+	.word  2
+	.word  38
+	.word  39
+	.word 1
+	.word  39
+	.word  40
+	.word  78
+    
+	.word 1
+	.word  38
+	.word  39
+	.word  40
+	.word 1
+	.word  39
+	.word  40
+	.word  77
+	.word 38
+	.word  39
+	.word  40
+	.word  77
+	.word 1
+	.word  38
+	.word  39
+	.word	77
+    
+	.word	0
+	.word  1
+	.word  39
+	.word  40
+	.word 2
+	.word  39
+	.word  40
+	.word  77
+	.word 0
+	.word  1
+	.word  39
+	.word  40
+	.word 2
+	.word  39
+	.word  40
+	.word  77
