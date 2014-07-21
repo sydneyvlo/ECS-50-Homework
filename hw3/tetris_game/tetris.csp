@@ -71,6 +71,12 @@
 
 ; Main
 	lds#	stackTop
+	cie
+	lda#	kbd_isr
+	sta	$FF8
+	lda#	$C0
+	outb	kbd_cntl
+	sie
 	psh#	speedPromptLen
 	psh#	speedPrompt
 	jsr	put_str
@@ -90,8 +96,9 @@
 	psh#	tetroPattern
 	jsr	startNewScreen
 	ads#	2
-main:	jmp	main	; Main nop loop
-	hlt	; for testing purposes
+main:	nop
+	jmp	main	; Main nop loop
+	; for testing purposes
 
 ; Notes: Prints out the description of the game 
 ; and instructions on starting the game.
@@ -372,7 +379,7 @@ ptPatterns:	lda	! ptLocal2	; row addr = 16 * row
 	lda+	patterns	; patterns[xr]
 	sta	! ptLocal4
 	mod#	38
-	ada#	1
+	ada#	2
 	psha
 	lda	! ptLocal4
 	div#	38
@@ -452,13 +459,15 @@ mcoffscreen:
 	fin#	0
 	rtn
 
-keyIsr:	psha
+kbd_isr:	psha
 	pshx
-key_status:	inb	kbd_stat
-	jeq	key_status
-	cma	xKey
+	inb	kbd_data
+	cma#	'x'
 	jeq	haltProg
+	jmp	key_Finish
 haltProg:	hlt
+key_Finish:	lda#	$C0
+	outb	kbd_cntl	
 	popx
 	popa
 	irtn
