@@ -269,7 +269,7 @@ startNewScreen:
 	ldx#	1	; tetromino->rotation = 0
 	lda#	0
 	sta&	! stTetromino
-	jmp	printTetromino
+	jsr	printTetromino
 	popx
 	popa
 	fin#	10
