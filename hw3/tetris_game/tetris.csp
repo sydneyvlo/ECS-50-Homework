@@ -252,6 +252,7 @@ startNewScreen:
 ; void startTetromino(Tetromino *tetromino)
 	.equ	stTetromino,	12
 	.equ	stLocal1,	9
+startTetromino:
 	bgn#	10
 	psha
 	pshx
