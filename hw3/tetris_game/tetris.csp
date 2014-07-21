@@ -80,6 +80,10 @@
 	lda#	crt_clr_dis	; Clear the display
 	outb	crt_cntl
 	jsr	showIntro
+	psh	score
+	psh#	tetroPattern
+	jsr	startNewScreen
+	ads#	2
 main:	jmp	main	; Main nop loop
 	hlt	; for testing purposes
 
@@ -226,7 +230,7 @@ random2:	bgn#	7
 ; Notes:
 ; Programmer notes:
 ; void startNewScreen(int score, Tetromino *tetromino)
-	.equ score_i, 13
+	.equ snsScore_i, 13
 	.equ	tetromino_i, 12
 	.equ snsLocal1, 9
 	; local variable ...
@@ -237,20 +241,33 @@ startNewScreen:
 	lda#	crt_clr_dis	; erase()
 	outb	crt_cntl	; Fills it with spaces already done.
 	ldx#	0
-	cmx#	14
+spLoop:	lda# 16
+	outb	crt_xreg
+	lda#	1
+	outb	crt_yreg
+	psh#	scorePromptLen
+	psh#	scorePrompt
+	jsr	put_str
+	ads#	2
+spDone:	ldx#	0
+snsLoop:	cmx#	14
 	jeq	snsDone
 	psh#	'|'	; for (y = 0; y < 14; y++) {
-	psh#	0	; 	putChar("|", 0, y);
+	psh#	1	; 	putChar("|", 0, y);
 	pshx		;	putChar("|", 11, y);
 	jsr	putChar	; }
 	ads#	3
 	psh#	'|'
-	psh#	11
+	psh#	15
 	pshx
 	jsr	putChar
 	ads#	3
 	adx#	1
-snsDone:	popx
+	jmp	snsLoop
+snsDone:	psh	! snsScore_i
+	jsr	showScore
+	ads#	1
+	popx
 	popa
 	fin#	10
 	rtn
@@ -377,13 +394,47 @@ putChar:
 	fin#	10
 	rtn
 
+
+;void showScore(int score)
+;{
+;  int i;
+;  char str[5];
+;  sprintf(str, "%04d", score);
+;
+;  for(i = 0; str[i]; i++)
+;    putChar(str[i], i + 22, 0);  // print score
+;
+;  refresh();
+;}  // showScore()
+; void showScore(int score)
+	.equ	ssScore,	12
+	.equ	ssLocal1,	9
+showScore:	bgn#	10
+	lda#	22
+	outb	crt_xreg
+	lda#	1
+	outb	crt_yreg
+	lda	! ssScore
+	jsr	put_num
+	jsr	mcoffscreen
+	fin#	10
+	rtn
+
+mcoffscreen:
+	bgn#	0
+	lda#	39
+	outb	crt_xreg
+	lda#	15
+	outb	crt_yreg	
+	fin#	0
+	rtn
+
 keyIsr:	psha
 	pshx
 key_status:	inb	kbd_stat
 	jeq	key_status
 	cma	xKey
 	jeq	haltProg
-	
 haltProg:	hlt
 	popx
 	popa
@@ -393,7 +444,8 @@ haltProg:	hlt
 ; User Variables
 seed:	.word		; int seed;
 seedPrompt:	.char	'Seed', seedPromptLen
-score:	.word		; int score;
+scorePrompt:	.char	'Score:', scorePromptLen
+score:	.word	0	; int score;
 speed:	.word		; int speed;
 enter:	.word	$0D	; Enter key
 xKey:	.word	'x'	; x
