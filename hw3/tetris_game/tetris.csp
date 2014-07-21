@@ -236,7 +236,21 @@ startNewScreen:
 	pshx
 	lda#	crt_clr_dis	; erase()
 	outb	crt_cntl	; Fills it with spaces already done.
-	popx
+	ldx#	0
+	cmx#	14
+	jeq	snsDone
+	psh#	'|'	; for (y = 0; y < 14; y++) {
+	psh#	0	; 	putChar("|", 0, y);
+	pshx		;	putChar("|", 11, y);
+	jsr	putChar	; }
+	ads#	3
+	psh#	'|'
+	psh#	11
+	pshx
+	jsr	putChar
+	ads#	3
+	adx#	1
+snsDone:	popx
 	popa
 	fin#	10
 	rtn
@@ -340,10 +354,40 @@ ptLoopEnd:	fin#	10
 ; Notes:
 ; Programmer notes:
 ; void putChar(char c, int x, int y)
+	.equ	pcC,	14
+	.equ	pcX,	13
+	.equ	pcY,	12
+	.equ	pcLocal1,	9
+	.equ	pcLocal2,	8
 putChar:
 	bgn#	10
+	lda	! pcX
+	outb	crt_xreg
+	lda	! pcY
+	ada#	1
+	outb	crt_yreg
+	lda	! pcC
+	outb	crt_data
+	lda#	39
+	outb	crt_xreg
+	lda#	15
+	outb	crt_yreg
+	lda#	' '
+	outb	crt_data
 	fin#	10
 	rtn
+
+keyIsr:	psha
+	pshx
+key_status:	inb	kbd_stat
+	jeq	key_status
+	cma	xKey
+	jeq	haltProg
+	
+haltProg:	hlt
+	popx
+	popa
+	irtn
 
 	
 ; User Variables
@@ -352,6 +396,7 @@ seedPrompt:	.char	'Seed', seedPromptLen
 score:	.word		; int score;
 speed:	.word		; int speed;
 enter:	.word	$0D	; Enter key
+xKey:	.word	'x'	; x
 key:	.char	'n', keyLen	; char key = "n"
 intro1:	.char	'Tetris Introduction', intro1Len
 intro2:	.char	'This is the minimal version of', intro2Len
