@@ -49,7 +49,7 @@
 
 ; Game Logistics
 	.equ	top,	0	; const int top;
-	.equ	bottom,	13	; const int bottom;
+	.equ	bottom,	14	; const int bottom;
 	.equ	max_right,	37	; const int max_right;
 	.equ	left_arrow,	'K'	; const int left
 	.equ	right_arrow,	'M'
@@ -65,18 +65,12 @@
 	.equ	location,	2
 
 ; Misc
-	.equ stackTop,	$e00
+	.equ stackTop,	$E00
 
 ; User Constants
 
 ; Main
 	lds#	stackTop
-	cie
-	lda#	kbd_isr
-	sta	$FF8
-	lda#	$C0
-	outb	kbd_cntl
-	sie
 	psh#	speedPromptLen
 	psh#	speedPrompt
 	jsr	put_str
@@ -96,6 +90,18 @@
 	psh#	tetroPattern
 	jsr	startNewScreen
 	ads#	2
+	cie
+	lda#	kbd_isr
+        	sta 	$FF8
+      	lda#	ena_and_res
+	outb kbd_cntl
+	lda#	tim_isr
+	sta	$FFB
+	lda#	2000
+	outw	tim_value
+	lda#	$D0
+	outb	tim_cntl
+	sie
 main:	nop
 	jmp	main	; Main nop loop
 	; for testing purposes
@@ -266,12 +272,12 @@ spDone:	ldx#	0
 snsLoop:	cmx#	14
 	jeq	snsDone
 	psh#	'|'	; for (y = 0; y < 14; y++) {
-	psh#	1	; 	putChar("|", 0, y);
+	psh#	0	; 	putChar("|", 0, y);
 	pshx		;	putChar("|", 11, y);
 	jsr	putChar	; }
 	ads#	3
 	psh#	'|'
-	psh#	15
+	psh#	14
 	pshx
 	jsr	putChar
 	ads#	3
@@ -374,12 +380,11 @@ ptPatterns:	lda	! ptLocal2	; row addr = 16 * row
 	pshx
 	adx	! ptLocal2	; pos = tetromino->location + patterns[tetromino->patterns][teromino->rotation][i]
 	adx	! ptLocal3
-	adx	! ptLocal1
 	psh	! ptLetter
 	lda+	patterns	; patterns[xr]
+	ada	! ptLocal1
 	sta	! ptLocal4
 	mod#	38
-	ada#	2
 	psha
 	lda	! ptLocal4
 	div#	38
@@ -409,6 +414,7 @@ ptLoopEnd:	fin#	10
 putChar:
 	bgn#	10
 	lda	! pcX
+	ada#	1
 	outb	crt_xreg
 	lda	! pcY
 	ada#	1
@@ -450,6 +456,247 @@ showScore:	bgn#	10
 	fin#	10
 	rtn
 
+;void changeTetromino(Tetromino *tetromino, char key)
+;{
+;  Tetromino tempTetromino;
+;  tempTetromino = *tetromino;
+;  
+;  switch(key)
+;  {
+;    case UP : tempTetromino.rotation = (tempTetromino.rotation + 1) % 4; break;
+;    case DOWN : tempTetromino.location += 38; break;
+;    case RIGHT : tempTetromino.location += 1; break;
+;    case LEFT : tempTetromino.location -= 1; break;
+;  } // switch
+;
+;  printTetromino(tetromino, ' ');
+;
+;  if(checkMove(&tempTetromino))
+;    *tetromino = tempTetromino;
+;
+;  printTetromino(tetromino, 'X');
+;  
+;  
+;} // changeTetromino()
+;tetroPattern
+;tetroRotation
+;tetroLocation
+;void changeTetromino(Tetromino *tetromino, char key)
+	.equ ctTetromino,	13
+	.equ	ctKey,	12
+	.equ	ctTempTetrominoPattern,	7
+	.equ	ctTempTetrominoRotation,	8
+	.equ	ctTempTetrominoLocation,	9
+	.equ	ctLocal1,	6
+changeTetromino:
+	bgn#	10
+	psha
+	pshx
+	ldx#	0
+	lda&	! ctTetromino
+	sta	! ctTempTetrominoPattern
+	ldx#	1
+	lda&	! ctTetromino
+	sta	! ctTempTetrominoRotation
+	ldx#	2
+	lda&	! ctTetromino
+	sta	! ctTempTetrominoLocation
+	lda	! ctKey
+	cma#	up_arrow
+	jeq	ctUp
+	cma#	down_arrow
+	jeq	ctDown
+	cma#	left_arrow
+	jeq	ctLeft
+	cma#	right_arrow
+	jeq	ctRight
+	jmp	ctPrint
+ctUp:	lda	! ctTempTetrominoRotation
+	ada#	1
+	mod#	4
+	sta	! ctTempTetrominoRotation
+	jmp	ctPrint
+ctDown:	lda	! ctTempTetrominoLocation
+	ada#	38
+	sta	! ctTempTetrominoLocation
+	psh#	!ctTempTetrominoPattern
+	jsr	checkMove
+	ads#	1
+	cma#	0
+	jeq	ctDownSub
+	jmp	ctPrint
+ctDownSub:	lda	! ctTempTetrominoLocation
+	sba#	38
+	sta	! ctTempTetrominoLocation
+	jmp	ctPrint
+ctRight:	lda	! ctTempTetrominoLocation
+	cma#	11
+	jeq	ctPrint
+	ada#	1
+	sta	! ctTempTetrominoLocation
+	jmp	ctPrint
+ctLeft:	lda	! ctTempTetrominoLocation
+	cma#	1
+	jeq	ctPrint
+	sba#	1
+	sta	! ctTempTetrominoLocation
+ctPrint:	lda	! ctTetromino
+	psha
+	psh#	' '
+	jsr	printTetromino
+	ads#	2
+	lda#	! ctTempTetrominoPattern
+	psha
+	psh#	'x'
+	jsr	printTetromino
+	ads#	2
+	pshx
+	lda	! ctTempTetrominoLocation
+	ldx#	2
+	sta&	! ctTetromino
+	lda	! ctTempTetrominoRotation
+	ldx#	1
+	sta&	! ctTetromino
+	popx
+	popx
+	popa
+	fin#	10
+	rtn
+
+;int checkMove(Tetromino *tetromino)
+;{
+;   int pos, i;
+;
+;   for(i = 0; i < 4; i++)
+;   {
+;     pos = tetromino->location + patterns[tetromino->pattern][tetromino->rotation][i];;
+;
+;     if(pos / 38 > BOTTOM)
+;         return 0;
+;     
+;     if(crt[pos / 38][pos % 38] != ' ')
+;         return 0;
+;   } // for i
+;
+;  return 1; // can move
+;}
+; int checkMove(Tetromino *tetromino)
+	.equ	cmTetromino,	12
+	.equ	cmLocal1,	9
+	.equ	cmLocal2,	8
+	.equ	cmLocal3,	7
+	.equ	cmLocal4,	6
+	.equ	cmLocal5,	5
+checkMove:	bgn#	10
+cmLoopSrt:	cmx#	4
+	jeq	cmLoopEnd
+	pshx
+	ldx#	2
+	lda&	! cmTetromino	; tetromino->location
+	sta	! cmLocal1		; pos = tetromino->location
+	ldx#	0
+	lda&	! cmTetromino		; ptLocal2 = tetroPattern ; tetroPattern is rows
+	sta	! cmLocal2
+	ldx#	1
+	lda&	! cmTetromino	; ptLocal3 = tetroRotation ; tetroRotation is col
+	sta	! cmLocal3
+	popx
+cmPatterns:	lda	! cmLocal2	; row addr = 16 * row
+	mul#	16
+	sta	! cmLocal2
+	lda	! cmLocal3	; col addr = (16 * row + 4 * col)
+	mul#	4
+	sta	! cmLocal3
+	pshx
+	adx	! cmLocal2	; pos = tetromino->location + patterns[tetromino->patterns][teromino->rotation][i]
+	adx	! cmLocal3
+	lda+	patterns	; patterns[xr]
+	ada	! cmLocal1
+	sta	! cmLocal4
+	popx
+	lda	! cmLocal4
+	div#	38
+	cma#	bottom
+	jeq	gtBottom
+	adx#	1	; xr++
+	jmp	cmLoopSrt
+gtBottom:	lda#	0
+	jmp	cmLoopEnd
+cmLoopEnd:	fin#	10
+	rtn
+
+;int play(int *score, Tetromino *tetromino)
+;{
+;  int col;
+;  Tetromino tempTetromino;
+
+;  tempTetromino = *tetromino;
+;  tempTetromino.location += 38;
+;  printTetromino(tetromino, ' ');
+;
+;  if(checkMove(&tempTetromino)) // can move
+;  {
+;    *tetromino = tempTetromino;  
+;    printTetromino(tetromino, 'X');
+;  }  // if can move
+;  else // cannot move
+;  {
+;    printTetromino(tetromino, 'X');
+;    checkLines(score);
+;
+;    for(col = 1; col <= 10; col++)
+;      if(crt[1][col] != ' ')
+;        return 0;  // X on the second row  so game over.
+;
+;    startTetromino(tetromino); 
+;  }  // else cannot move
+;
+;  return 1;
+;}  // play()
+
+; int play(int *score, Tetromino *tetromino)
+	.equ	pScore,	13
+	.equ	pTetromino,	12
+	.equ	pTempTetrominoLocation,	11
+	.equ	pTempTetrominoRotation,	10
+	.equ	pTempTetrominoPattern,	9
+play:	bgn#	10
+	ldx#	0
+	lda&	! pTetromino
+	sta	! pTempTetrominoPattern
+	ldx#	1
+	lda&	! pTetromino
+	sta	! pTempTetrominoRotation
+	ldx#	2
+	lda&	! pTetromino
+	sta	! pTempTetrominoLocation
+	lda	! pTempTetrominoLocation
+	ada#	38
+	sta	! pTempTetrominoLocation
+	psh	! pTetromino
+	psh#	'x'
+	jsr	printTetromino
+	ads#	2
+	psh#	! pTempTetrominoPattern
+	jsr	checkMove
+	cma#	0
+	jeq	invalidMove
+	lda	!pTempTetrominoLocation
+	ldx#	2
+	sta&	! pTetromino
+	psh	! pTetromino
+	psh#	'x'
+	jsr	printTetromino
+	ads#	2
+invalidMove:
+	psh	! pTetromino
+	psh#	'x'
+	jsr	printTetromino
+	ads#	2
+	; for (col....	
+	fin#	10
+	rtn
+
 mcoffscreen:
 	bgn#	0
 	lda#	39
@@ -459,15 +706,34 @@ mcoffscreen:
 	fin#	0
 	rtn
 
+
+
 kbd_isr:	psha
 	pshx
 	inb	kbd_data
 	cma#	'x'
+	cma#	$1B
+	jne	kbdNotEsc
+	inb	kbd_data
+	jmp	kbdNotEsc
 	jeq	haltProg
+kbdNotEsc:	psh#	tetroPattern
+	psha
+	jsr	changeTetromino
+	ads#	2	
 	jmp	key_Finish
 haltProg:	hlt
 key_Finish:	lda#	$C0
 	outb	kbd_cntl	
+	popx
+	popa
+	irtn
+
+tim_isr:	psha
+	pshx
+	lda#	1
+	lda#	$D0	;reset ready bit
+	outb	$030
 	popx
 	popa
 	irtn
