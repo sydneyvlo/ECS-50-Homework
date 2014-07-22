@@ -180,6 +180,10 @@ getKey:	bgn#	2
 gkLoop:	inb	kbd_stat	
 	jeq	gkLoop
 	inb	kbd_data	; if((key = getch()) != ERR)
+	cma#	$1B
+	jne	gkNoEsc
+	inb	kbd_stat
+gkNoEsc:
 	cma#	left_arrow
 	jeq	gkDone
 	cma#	right_arrow
@@ -688,13 +692,16 @@ play:	bgn#	10
 	psh#	'x'
 	jsr	printTetromino
 	ads#	2
+	lda#	1
+	jmp pFinish
 invalidMove:
 	psh	! pTetromino
 	psh#	'x'
 	jsr	printTetromino
 	ads#	2
+	lda#	0
 	; for (col....	
-	fin#	10
+pFinish:	fin#	10
 	rtn
 
 mcoffscreen:
@@ -731,9 +738,40 @@ key_Finish:	lda#	$C0
 
 tim_isr:	psha
 	pshx
-	lda#	1
-	lda#	$D0	;reset ready bit
-	outb	$030
+	psh#	score
+	psh#	tetroPattern
+	jsr	play
+	ads#	2
+	cma#	1
+	jeq tdoWhile
+tdoWhile:	jsr getKey
+	sta	key
+	cma	left_arrow
+	jeq	tLeft
+	cma	right_arrow
+	jeq	tRight
+	cma	up_arrow
+	jeq	tUp
+	cma	down_arrow
+	jeq	tDown
+tLeft:	psh#	tetroPattern
+	psh	key
+	jsr	changeTetromino
+	ads#	2
+tRight:	psh#	tetroPattern
+	psh	key
+	jsr	changeTetromino
+	ads#	2
+tUp:	psh#	tetroPattern
+	psh	key
+	jsr	changeTetromino
+	ads#	2
+tDown:	psh#	tetroPattern
+	psh	key	
+	jsr	changeTetromino
+	ads#	2
+	lda#	$D0
+	outb	tim_cntl
 	popx
 	popa
 	irtn
