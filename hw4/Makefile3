@@ -1,0 +1,11 @@
+# Authors: Sean Davis
+
+sort3.out : sorting3.c sort3.o 
+	gcc -g -o sort3.out sorting3.c sort3.o 
+	
+sort3.o : sort3.asm
+	nasm -f elf -o sort3.o sort3.asm
+
+clean : 
+	rm -f sort3.out sorting3.o sort3.o sorting3.s
+

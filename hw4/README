@@ -1,0 +1,12 @@
+To compile inline assembly using Intel to use with gdb do the following:
+[davis@lect1 private]$ gcc -S -masm=intel selsorting2.c                          
+[davis@lect1 private]$ as --gstabs -o selsorting2.o selsorting2.s
+[davis@lect1 private]$ gcc -g -o selsorting.out selsorting2.o
+
+Note that gcc automatically adds the following to the call:
+
+push ebp
+mov ebp, esp
+
+So do not have them in your assembly.  I have commented them out in my
+selsorting2.c

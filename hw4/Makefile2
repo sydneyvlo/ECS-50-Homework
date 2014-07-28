@@ -1,0 +1,8 @@
+sorting2.out : sorting2.o
+	gcc -g -o sorting2out sorting2.o
+
+sorting2.o : sorting2.s
+	as --gstabs -o sorting2.o sorting2.s
+
+sorting2.s : sorting2.c
+	gcc -S -masm=intel sorting2.c                          

@@ -1,0 +1,17 @@
+# Authors: Sean Davis
+
+sort1.out : sorting1.o sort.o 
+	gcc -g -o sort1.out sorting1.o sort.o 
+
+sorting1.o : sorting1.s
+	as --gstabs -o sorting1.o sorting1.s
+	
+sorting1.s : sorting1.c
+	gcc -S sorting1.c
+	
+sort.o : sort.asm
+	nasm -f elf sort.asm
+
+clean : 
+	rm -f sort1.out sorting1.o sort.o sorting1.s
+
