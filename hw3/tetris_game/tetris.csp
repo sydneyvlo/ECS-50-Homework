@@ -744,6 +744,7 @@ tim_isr:	psha
 	ads#	2
 	cma#	1
 	jeq tdoWhile
+	jmp	tDone
 tdoWhile:	jsr getKey
 	sta	key
 	cma	left_arrow
@@ -770,7 +771,7 @@ tDown:	psh#	tetroPattern
 	psh	key	
 	jsr	changeTetromino
 	ads#	2
-	lda#	$D0
+tDone: 	lda#	$D0
 	outb	tim_cntl
 	popx
 	popa
